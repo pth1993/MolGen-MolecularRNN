@@ -7,14 +7,26 @@ from Utils.utils import *
 
 if __name__ == "__main__":
     smiles = "CC(C)(C)c1ccc2occ(CC(=O)Nc3ccccc3F)c2c1"
-    A, X = Smiles2Graph(smiles)
-    mol = orderBFSmol(A, X)
+    # smiles = "c1ccccc1"
+    # smiles = "CCC"
+
+    mol = Chem.MolFromSmiles(smiles)
+    A, X = Smiles2Graph(smiles, is_Tensor=False)
+    mol = orderBFSmol(A, X, num_atom=mol.GetNumAtoms())
     DrawMol(mol, "data/result/structure/sample.png", size=(1000, 1000))
 
     # rwmol = Chem.RWMol()
     # rwmol.AddAtom(Chem.Atom(6))
-    # print(rwmol.GetNumAtoms())
+    # rwmol.AddAtom(Chem.Atom(6))
+    # rwmol.AddBond(0, 1, Chem.BondType.SINGLE)
+    # rwmol.AddAtom(Chem.Atom(6))
+    # rwmol.AddBond(1, 2, Chem.BondType.SINGLE)
+    # rwmol.AddAtom(Chem.Atom(6))
+    # rwmol.AddBond(2, 3, Chem.BondType.SINGLE)
+    # rwmol.AddAtom(Chem.Atom(6))
+    # rwmol.AddBond(3, 4, Chem.BondType.SINGLE)
+    # rwmol.AddBond(4, 0, Chem.BondType.SINGLE)
     # mol = rwmol.GetMol()
     #
-    # DrawMol(Chem.MolToSmiles(mol), "data/result/structure/sample.png", size=(1000, 1000))
+    # DrawMol(mol, "data/result/structure/sample.png", size=(1000, 1000))
 

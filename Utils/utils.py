@@ -20,10 +20,11 @@ import torch.nn.functional as F
 import torch.optim as optim
 
 
-# atom idx , E = empty
+# atom idx for ZINC250k, E = empty
 ATOM_IDX = {"E": 0, "C": 1, "N": 2, "O": 3, "F": 4, "P": 5, "S": 6, "Cl": 7, "Br": 8, "I": 9}
 ATOM_IDX_INV = {0: "E", 1: "C", 2: "N", 3: "O", 4: "F", 5: "P", 6: "S", 7: "Cl", 8: "Br", 9: "I"}
 PERIODIC_TABLE = {"C": 6, "N": 7, "O": 8, "F": 9, "P": 15, "S": 16, "Cl": 17, "Br": 35, "I": 53, }
+PERIOD_TO_IND = {1: 6, 2: 7, 3: 8, 4: 9, 5: 15, 6: 16, 7: 17, 8: 35, 9: 53}
 
 # bond idx
 BOND_IDX = {"ZERO": 0, "SINGLE": 1, "DOUBLE": 2, "TRIPLE": 3}
@@ -34,7 +35,7 @@ NUM_BOND = len(BOND_IDX)
 NUM_ATOM = len(ATOM_IDX)
 
 
-def generate_adj(mol):
+def generate_adj(mol, is_Tensor=True):
     A = np.zeros([MAX_NODE, MAX_NODE, NUM_BOND])
     A[:, :, 0] = 1
 
@@ -45,6 +46,9 @@ def generate_adj(mol):
             A[j, i, :] = 0
             A[i, j, BOND_IDX[b_type]] = 1
             A[j, i, BOND_IDX[b_type]] = 1
+
+    if not is_Tensor:
+        A = np.argmax(A, axis=2)
 
     return A
 
@@ -62,11 +66,11 @@ def generate_feture(mol):
     return X
 
 
-def Smiles2Graph(smiles):
+def Smiles2Graph(smiles, is_Tensor=True):
     mol = Chem.MolFromSmiles(smiles)
     Chem.Kekulize(mol, clearAromaticFlags=False)
 
-    A = generate_adj(mol)
+    A = generate_adj(mol, is_Tensor)
     X = generate_feture(mol)
 
     return A, X
@@ -86,38 +90,42 @@ def DrawMol(mol, out_path, size=(500, 500)):
         f.write(img)
 
 
-def orderBFSmol(A, X):
+def orderBFSmol(A, X, num_atom):
     rwmol = Chem.RWMol()
-    rwmol.AddAtom(Chem.Atom(6))
 
     bfs_queue = [0]
-    visited_node = [0]
-    new_index = -1*np.ones(A.shape[0])
+    visited_node = []
+    new_index = [-1 for i in range(A.shape[0])]
 
-    rwmol.AddAtom(Chem.Atom(np.argmax(X[0:]))).SetAtomMapNum(0)
+    rwmol.AddAtom(Chem.Atom(PERIOD_TO_IND[int(np.argmax(X[0:]))]))
     new_index[0] = 0
     ind_counter = 1
 
-    while ind_counter < A.shape[0]:
+    while len(bfs_queue) > 0:
         c_node = bfs_queue[0]
-        bfs_queue.remove(c_node)
+        bfs_queue = bfs_queue[1:]
 
-        for i in range(A.shape[0]):
+        for i in range(num_atom):
             btype = A[c_node, i]
-            if btype != 0 and i not in visited_node:
+            if btype != 0 and i not in visited_node and i not in bfs_queue:
                 bfs_queue.append(i)
-                rwmol.AddAtom(Chem.Atom(np.argmax(X[i:]))).SetAtomMapNum(ind_counter)
+                rwmol.AddAtom(Chem.Atom(PERIOD_TO_IND[int(np.argmax(X[i:]))]))
                 new_index[i] = ind_counter
-
-                if btype == 1:
-                    rwmol.AddBond(new_index[c_node], ind_counter, Chem.BondType.SINGLE)
-                elif btype == 2:
-                    rwmol.AddBond(new_index[c_node], ind_counter, Chem.BondType.DOUBLE)
-                elif btype == 3:
-                    rwmol.AddBond(new_index[c_node], ind_counter, Chem.BondType.TRIPLE)
-
                 ind_counter += 1
 
-    return rwmol.GetMol()
+        for i in visited_node:
+            btype = A[c_node, i]
+            if btype == 1:
+                rwmol.AddBond(new_index[c_node], new_index[i], Chem.BondType.SINGLE)
+            elif btype == 2:
+                rwmol.AddBond(new_index[c_node], new_index[i], Chem.BondType.DOUBLE)
+            elif btype == 3:
+                rwmol.AddBond(new_index[c_node], new_index[i], Chem.BondType.TRIPLE)
+        visited_node.append(c_node)
+
+    mol = rwmol.GetMol()
+    # Chem.SanitizeMol(mol)
+
+    return mol
 
 
