@@ -10,6 +10,7 @@ from tqdm import tqdm
 import time
 
 import rdkit.Chem as Chem
+from rdkit.Chem.Draw import rdMolDraw2D
 from rdkit import RDLogger
 RDLogger.DisableLog('rdApp.*')
 
@@ -56,7 +57,7 @@ def generate_feture(mol):
             X[i, a_type] = 1
 
         for i in range(MAX_NODE - len(atoms)):
-            X[len(atoms), 0] = 1
+            X[len(atoms)+i, 0] = 1
 
     return X
 
@@ -69,3 +70,54 @@ def Smiles2Graph(smiles):
     X = generate_feture(mol)
 
     return A, X
+
+
+def DrawMol(mol, out_path, size=(500, 500)):
+    drawer = rdMolDraw2D.MolDraw2DCairo(size[0], size[1])
+    tm = rdMolDraw2D.PrepareMolForDrawing(mol)
+    option = drawer.drawOptions()
+    option.addAtomIndices = True
+
+    drawer.DrawMolecule(tm)
+    drawer.FinishDrawing()
+
+    img = drawer.GetDrawingText()
+    with open(out_path, mode="wb") as f:
+        f.write(img)
+
+
+def orderBFSmol(A, X):
+    rwmol = Chem.RWMol()
+    rwmol.AddAtom(Chem.Atom(6))
+
+    bfs_queue = [0]
+    visited_node = [0]
+    new_index = -1*np.ones(A.shape[0])
+
+    rwmol.AddAtom(Chem.Atom(np.argmax(X[0:]))).SetAtomMapNum(0)
+    new_index[0] = 0
+    ind_counter = 1
+
+    while ind_counter < A.shape[0]:
+        c_node = bfs_queue[0]
+        bfs_queue.remove(c_node)
+
+        for i in range(A.shape[0]):
+            btype = A[c_node, i]
+            if btype != 0 and i not in visited_node:
+                bfs_queue.append(i)
+                rwmol.AddAtom(Chem.Atom(np.argmax(X[i:]))).SetAtomMapNum(ind_counter)
+                new_index[i] = ind_counter
+
+                if btype == 1:
+                    rwmol.AddBond(new_index[c_node], ind_counter, Chem.BondType.SINGLE)
+                elif btype == 2:
+                    rwmol.AddBond(new_index[c_node], ind_counter, Chem.BondType.DOUBLE)
+                elif btype == 3:
+                    rwmol.AddBond(new_index[c_node], ind_counter, Chem.BondType.TRIPLE)
+
+                ind_counter += 1
+
+    return rwmol.GetMol()
+
+
