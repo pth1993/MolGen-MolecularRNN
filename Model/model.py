@@ -10,7 +10,7 @@ class NodeRNN(nn.Module):
                  out_features, seq_len, dr_rate=0.2):
         super(NodeRNN, self).__init__()
         self.seq_len = seq_len
-        self.embedding_adj = nn.Embedding(input_size_adj, emb_size, padding_idx=0)
+        self.embedding_adj = nn.Linear(input_size_adj, emb_size, bias=False)
         self.embedding_node = nn.Embedding(input_size_node, emb_size, padding_idx=0)
         self.lstm = nn.LSTM(input_size=emb_size, hidden_size=hidden_lstm_size, num_layers=num_layers,
                             dropout=dr_rate, batch_first=True)
@@ -21,19 +21,23 @@ class NodeRNN(nn.Module):
         )
 
     def forward(self, x_adj, x_node, x_len):
-        h_S = self.embedding(x_adj)
-        h_C = self.embedding(x_node)
+        h_S = []
+        for i in range(self.seq_len):
+            y = self.embedding_adj(x_adj[:, i])
+            h_S.append(y)
+        h_S = torch.stack(h_S, dim=1)
+        h_C = self.embedding_node(x_node)
         h = torch.cat((h_S, h_C), dim=1)
         h = torch.nn.utils.rnn.pack_padded_sequence(h, x_len, batch_first=True, enforce_sorted=False)
-        h, state = self.lstm_fr(h)
-        h, _ = torch.nn.utils.rnn.pad_packed_sequence(h, batch_first=True, total_length=self.fr_len)
+        h, _ = self.lstm(h)
+        h, _ = torch.nn.utils.rnn.pad_packed_sequence(h, batch_first=True, total_length=self.seq_len)
         outputs = []
         for i in range(self.seq_len):
             y = self.header(h[:, i])
             outputs.append(y)
         outputs = torch.stack(outputs, dim=1)
 
-        return outputs, state
+        return outputs, h
 
 
 class EdgeRNN(nn.Module):
@@ -41,7 +45,7 @@ class EdgeRNN(nn.Module):
                  seq_len, dr_rate=0.2):
         super(EdgeRNN, self).__init__()
         self.seq_len = seq_len
-        self.embedding = nn.Embedding(input_size, emb_size, padding_idx=0)
+        self.embedding = nn.Embedding(input_size, emb_size)
         self.lstm = nn.LSTM(input_size=emb_size, hidden_size=hidden_lstm_size, num_layers=num_layers,
                             dropout=dr_rate, batch_first=True)
         self.header = nn.Sequential(
@@ -50,11 +54,10 @@ class EdgeRNN(nn.Module):
             nn.Linear(in_features=hidden_header_size, out_features=out_features)
         )
 
-    def forward(self, x, x_len, state):
+    def forward(self, x, h_node):
         h = self.embedding(x)
-        h = torch.nn.utils.rnn.pack_padded_sequence(h, x_len, batch_first=True, enforce_sorted=False)
-        h, state = self.lstm_fr(h, state)
-        h, _ = torch.nn.utils.rnn.pad_packed_sequence(h, batch_first=True, total_length=self.fr_len)
+        h = torch.cat((h, h_node.view([h_node.shape[0], 1, -1])), dim=1)
+        h, state = self.lstm(h)
         outputs = []
         for i in range(self.seq_len):
             y = self.header(h[:, i])

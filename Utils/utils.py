@@ -34,6 +34,8 @@ MAX_NODE = 40
 NUM_BOND = len(BOND_IDX)
 NUM_ATOM = len(ATOM_IDX)
 
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
 
 def generate_adj(mol, is_Tensor=True):
     A = np.zeros([MAX_NODE, MAX_NODE, NUM_BOND])
@@ -126,5 +128,14 @@ def orderBFSmol(A, X, num_atom):
     # Chem.SanitizeMol(mol)
 
     return mol
+
+
+def read_smilesset(path):
+    smiles_list = []
+    with open(path) as f:
+        for smiles in f:
+            smiles_list.append(smiles.rstrip())
+
+    return smiles_list
 
 

@@ -14,7 +14,7 @@ if __name__ == "__main__":
     A, X = Smiles2Graph(mol, is_Tensor=False)
     mol = orderBFSmol(A, X, num_atom=mol.GetNumAtoms())
     A, X = Smiles2Graph(mol, is_Tensor=False)
-    print(np.argmax(X, axis=1))
+    print(X.shape)
     # DrawMol(mol, "data/result/structure/sample_t.png", size=(1000, 1000))
 
     # rwmol = Chem.RWMol()
