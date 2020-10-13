@@ -30,7 +30,7 @@ PERIOD_TO_IND = {1: 6, 2: 7, 3: 8, 4: 9, 5: 15, 6: 16, 7: 17, 8: 35, 9: 53}
 BOND_IDX = {"ZERO": 0, "SINGLE": 1, "DOUBLE": 2, "TRIPLE": 3}
 
 
-MAX_NODE = 30
+MAX_NODE = 40
 NUM_BOND = len(BOND_IDX)
 NUM_ATOM = len(ATOM_IDX)
 
@@ -66,8 +66,7 @@ def generate_feture(mol):
     return X
 
 
-def Smiles2Graph(smiles, is_Tensor=True):
-    mol = Chem.MolFromSmiles(smiles)
+def Smiles2Graph(mol, is_Tensor=True):
     Chem.Kekulize(mol, clearAromaticFlags=False)
 
     A = generate_adj(mol, is_Tensor)

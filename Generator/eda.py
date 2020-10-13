@@ -11,9 +11,11 @@ if __name__ == "__main__":
     # smiles = "CCC"
 
     mol = Chem.MolFromSmiles(smiles)
-    A, X = Smiles2Graph(smiles, is_Tensor=False)
+    A, X = Smiles2Graph(mol, is_Tensor=False)
     mol = orderBFSmol(A, X, num_atom=mol.GetNumAtoms())
-    DrawMol(mol, "data/result/structure/sample.png", size=(1000, 1000))
+    A, X = Smiles2Graph(mol, is_Tensor=False)
+    print(np.argmax(X, axis=1))
+    # DrawMol(mol, "data/result/structure/sample_t.png", size=(1000, 1000))
 
     # rwmol = Chem.RWMol()
     # rwmol.AddAtom(Chem.Atom(6))
