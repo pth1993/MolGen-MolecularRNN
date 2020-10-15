@@ -29,8 +29,9 @@ class NodeRNN(nn.Module):
         h_C = self.embedding_node(x_node)
         h = torch.cat((h_S, h_C), dim=1)
         h = torch.nn.utils.rnn.pack_padded_sequence(h, x_len, batch_first=True, enforce_sorted=False)
-        h, _ = self.lstm(h)
+        h, state = self.lstm(h)
         h, _ = torch.nn.utils.rnn.pad_packed_sequence(h, batch_first=True, total_length=self.seq_len)
+        print(h.shape, state[0].shape, state[1].shape)
         outputs = []
         for i in range(self.seq_len):
             y = self.header(h[:, i])
@@ -54,16 +55,19 @@ class EdgeRNN(nn.Module):
             nn.Linear(in_features=hidden_header_size, out_features=out_features)
         )
 
-    def forward(self, x, h_node):
+    def forward(self, x, state):
         h = self.embedding(x)
-        h = torch.cat((h, h_node.view([h_node.shape[0], 1, -1])), dim=1)
-        h, state = self.lstm(h)
-        outputs = []
-        for i in range(self.seq_len):
-            y = self.header(h[:, i])
-            outputs.append(y)
-        outputs = torch.stack(outputs, dim=1)
-        return outputs
+        print(x.shape, h.shape, state[0].shape)
+        # h = torch.cat((h, h_node.view([h_node.shape[0], 1, -1])), dim=1)
+        h, state = self.lstm(h, state)
+        # outputs = []
+        # for i in range(self.seq_len):
+        #     y = self.header(h[:, i])
+        #     outputs.append(y)
+        # outputs = torch.stack(outputs, dim=1)
+        # outputs = torch.zeros([h.shape[0], ])
+
+        return h
 
 
 if __name__ == "__main__":

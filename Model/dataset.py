@@ -68,7 +68,7 @@ if __name__ == "__main__":
     for i, (S_i, C, S_ij, x_len) in enumerate(train_loader):
         y = nodemodel(S_i.cuda(), C.cuda(), x_len)
         print(y[0].shape, y[1].shape)
-        e = edgemodel(S_ij[:, 0, ].cuda(), y[1][:, 0])
+        e = edgemodel(S_ij[:, 0, ].cuda(), (y[1][0][:, 0, :], y[1][0][:, 0, :]))
         print(e.shape)
         break
 
