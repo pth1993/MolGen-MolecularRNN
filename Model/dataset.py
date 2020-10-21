@@ -55,12 +55,12 @@ class MolDataset(torch.utils.data.Dataset):
 
 
 if __name__ == "__main__":
-    smiles_list = read_smilesset("data/zinc_250k.smi")
+    smiles_list = read_smilesset("data/zinc_train.smi")
     train_dataset = MolDataset(smiles_list)
     train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=32, shuffle=True)
-    nodemodel = NodeRNN(input_size_adj=12, input_size_node=10, emb_size=64, hidden_lstm_size=128, num_layers=2,
+    nodemodel = NodeRNN(input_size_adj=12, input_size_node=10, emb_size=64, hidden_rnn_size=128, num_layers=2,
                         hidden_header_size=64, out_features=10, seq_len=40)
-    edgemodel = EdgeRNN(input_size=4, emb_size=128, hidden_lstm_size=128, num_layers=2, hidden_header_size=64,
+    edgemodel = EdgeRNN(input_size=4, emb_size=128, hidden_rnn_size=128, num_layers=2, hidden_header_size=64,
                         out_features=4, seq_len=12)
     nodemodel.to(device)
     edgemodel.to(device)
@@ -68,8 +68,6 @@ if __name__ == "__main__":
     for i, (S_i, C, S_ij, x_len) in enumerate(train_loader):
         y = nodemodel(S_i.cuda(), C.cuda(), x_len)
         print(y[0].shape, y[1].shape)
-        e = edgemodel(S_ij[:, 0, ].cuda(), (y[1][0][:, 0, :], y[1][0][:, 0, :]))
+        e = edgemodel(S_ij[:, 0, ].cuda(), y[1][:, :, 0, ])
         print(e.shape)
         break
-
-
