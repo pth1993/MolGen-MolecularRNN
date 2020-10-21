@@ -10,8 +10,8 @@ from Model.dataset import MolDataset
 def train(train_list, test_list, num_epoch, batch_size, num_layers=2):
     train_dataset = MolDataset(train_list)
     test_dataset = MolDataset(test_list)
-    train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
-    test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=batch_size, shuffle=True)
+    train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=batch_size, shuffle=True, drop_last=True)
+    test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=batch_size, shuffle=True, drop_last=True)
 
     node_model = NodeRNN(input_size_adj=MAX_TIMESTEP, input_size_node=len(ATOM_IDX), emb_size=64, hidden_rnn_size=128,
                          num_layers=num_layers, hidden_header_size=64, out_features=len(ATOM_IDX),
@@ -44,31 +44,52 @@ def train(train_list, test_list, num_epoch, batch_size, num_layers=2):
             edge_loss = edge_criterion(edge_pred.contiguous().view(-1, len(BOND_IDX)), S_ij.contiguous().view(-1, ))
             edge_loss.backward(retain_graph=True)
             edge_optimizer.step()
-            print("EPOCH%d:%d, Train Edge loss:%f" % (n, i, edge_loss))
 
             node_loss = node_criterion(y_node[0].view(-1, len(ATOM_IDX)), C.view(-1, ))
             node_loss.backward()
             node_optimizer.step()
-            print("EPOCH%d:%d, Train Node loss:%f" % (n, i, node_loss))
+            print("EPOCH%d:%d, Train loss:%f,  %f" % (n, i, node_loss, edge_loss))
+
+        if n % 10 == 0:
+            torch.save(node_model.state_dict(), f"data/model/NodeRNN-ep{n}.pth")
+            torch.save(edge_model.state_dict(), f"data/model/EdgeRNN-ep{n}.pth")
 
         with torch.no_grad():
-            test_losses = []
+            valid_node_loss = []
+            valid_edge_loss = []
             for i, (S_i, C, S_ij, x_len) in enumerate(test_loader):
                 S_i = S_i.to(device)
                 C = C.to(device)
                 S_ij = S_ij.to(device)
 
-    return node_model, edge_model
+                y_node = node_model(S_i, C, x_len)
+
+                edge_pred = torch.zeros([batch_size, MAX_NODE * MAX_TIMESTEP, len(BOND_IDX)], requires_grad=True).to(
+                    device)
+                for j in range(max(x_len)):
+                    y_edge = edge_model(S_ij[:, j, ], y_node[1][:, :, j])
+                    edge_pred[:, MAX_TIMESTEP * j:MAX_TIMESTEP * (j + 1), ] = y_edge
+
+                edge_loss = edge_criterion(edge_pred.contiguous().view(-1, len(BOND_IDX)), S_ij.contiguous().view(-1, ))
+                node_loss = node_criterion(y_node[0].view(-1, len(ATOM_IDX)), C.view(-1, ))
+                valid_node_loss.append(float(node_loss))
+                valid_edge_loss.append(float(edge_loss))
+            print("EPOCH%d Validation loss: %f,  %f" % (n, float(np.mean(valid_node_loss)),
+                                                        float(np.mean(valid_edge_loss))))
 
 
 if __name__ == "__main__":
-    smiles_list = read_smilesset("data/zinc_train.smi")
+    smiles_list = read_smilesset("data/zinc_250k.smi")
     sp = int(len(smiles_list)*0.8)
     train_list = smiles_list[:sp]
     test_list = smiles_list[sp:]
 
-    node_model, edge_model = train(train_list, test_list, num_epoch=10, batch_size=512)
+    start = time.time()
+    train(train_list, test_list, num_epoch=100, batch_size=512)
+    end = time.time()
 
-    torch.save(node_model.state_dict(), "data/model/NodeRNN.pth")
-    torch.save(edge_model.state_dict(), "data/model/EdgeRNN.pth")
+    print("Execution Time: %f" % (end-start))
+
+
+
 
