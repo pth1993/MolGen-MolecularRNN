@@ -69,10 +69,11 @@ if __name__ == "__main__":
         print(S_i.shape)
         print(S_ij.shape, S_ij[:, :, :MAX_TIMESTEP].shape)
         print(C.shape, C[:, :-1].shape)
+        print("---------------------")
         S_i = S_i.to(device)
         C = C.to(device)
         y = nodemodel(S_i, C[:, :-1].contiguous(), x_len)
-        print(y[0].shape, y[1].shape, y[1][:, :, 0, ].shape)
-        e = edgemodel(S_ij[:, 0, :MAX_TIMESTEP].contiguous().to(device), y[1][:, :, 0, ].contiguous())
+        print(y[0].shape, y[1].shape)
+        e = edgemodel(S_ij[:, 0, :MAX_TIMESTEP].contiguous().to(device), y[1][:, -1, ].contiguous())
         print(e.shape)
         break

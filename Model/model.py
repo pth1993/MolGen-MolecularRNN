@@ -45,7 +45,7 @@ class NodeRNN(nn.Module):
             y = self.header(h4[:, i])
             outputs[:, i, ] = y
 
-        return outputs, torch.stack([h1, h2, h3, h4], dim=1)
+        return outputs, h4
 
 
 class EdgeRNN(nn.Module):
@@ -68,11 +68,10 @@ class EdgeRNN(nn.Module):
     def forward(self, x, state):
         h = self.embedding(x)
         print(h.shape, state.shape)
-        h, _ = self.rnn1(h, state[:, 0].contiguous().unsqueeze(0))
-        print(h.shape)
-        h, _ = self.rnn2(h, state[:, 1].contiguous().unsqueeze(0))
-        h, _ = self.rnn3(h, state[:, 2].contiguous().unsqueeze(0))
-        h, _ = self.rnn4(h, state[:, 3].contiguous().unsqueeze(0))
+        h, _ = self.rnn1(h, state.contiguous().unsqueeze(0))
+        h, _ = self.rnn2(h)
+        h, _ = self.rnn3(h)
+        h, _ = self.rnn4(h)
 
         outputs = torch.zeros([h.shape[0], self.seq_len, len(BOND_IDX)], device=device)
         for i in range(self.seq_len):
