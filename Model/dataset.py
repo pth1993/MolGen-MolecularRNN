@@ -30,21 +30,21 @@ class MolDataset(torch.utils.data.Dataset):
         S_i = np.zeros([self.seq_len, self.max_dim])
         for i in range(A.shape[0]):
             if i < self.max_dim:
-                # print(S_i[i, self.max_dim-i-1:])
-                # print(A_exs[i, :i+1])
-                S_i[i, self.max_dim-i-1:] = A_exs[i, :i+1]
+                S_i[i, :i] = A_exs[i, :i]
             else:
-                S_i[i, ] = A_exs[i, i-12:i]
+                S_i[i, ] = A_exs[i, i-12:i][::-1]
         C = np.argmax(X, axis=1)
+        C = np.insert(C, 0, ATOM_IDX["&"])
         atom_num = mol.GetNumAtoms()
 
         # create Input for EdgeRNN
-        S_ij = np.zeros([self.seq_len, self.max_dim])
+        S_ij = np.zeros([self.seq_len, self.max_dim+1])
+        S_ij[:, 0] = np.ones(self.seq_len) * BOND_IDX["&"]
         for i in range(A.shape[0]):
             if i < self.max_dim:
-                S_i[i, self.max_dim-i-1:] = A[i, :i+1]
+                S_ij[i, 1:i+1] = A[i, :i]
             else:
-                S_i[i, ] = A[i, i-12:i]
+                S_ij[i, 1:] = A[i, i-12:i][::-1]
 
         # convert numpy.ndarray to torch.tensor
         S_i = torch.tensor(S_i, dtype=torch.float)
@@ -55,19 +55,26 @@ class MolDataset(torch.utils.data.Dataset):
 
 
 if __name__ == "__main__":
-    smiles_list = read_smilesset("data/zinc_train.smi")
+    smiles_list = read_smilesset("data/zinc_250k.smi")
     train_dataset = MolDataset(smiles_list)
     train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=32, shuffle=True)
-    nodemodel = NodeRNN(input_size_adj=12, input_size_node=10, emb_size=64, hidden_rnn_size=128, num_layers=2,
-                        hidden_header_size=64, out_features=10, seq_len=40)
-    edgemodel = EdgeRNN(input_size=4, emb_size=128, hidden_rnn_size=128, num_layers=2, hidden_header_size=64,
-                        out_features=4, seq_len=12)
+    nodemodel = NodeRNN(input_size_adj=MAX_TIMESTEP, input_size_node=len(ATOM_IDX), emb_size=128, hidden_rnn_size=256,
+                        hidden_header_size=128, out_features=len(ATOM_IDX), seq_len=40)
+    edgemodel = EdgeRNN(input_size=len(BOND_IDX), emb_size=16, hidden_rnn_size=128, hidden_header_size=64,
+                        out_features=len(BOND_IDX), seq_len=MAX_TIMESTEP)
     nodemodel.to(device)
     edgemodel.to(device)
 
     for i, (S_i, C, S_ij, x_len) in enumerate(train_loader):
-        y = nodemodel(S_i.cuda(), C.cuda(), x_len)
+        print(S_i.shape)
+        print(S_ij.shape, S_ij[:, :, :MAX_TIMESTEP].shape)
+        print(C.shape, C[:, :-1].shape)
+        print("---------------------")
+        S_i = S_i.to(device)
+        C = C.to(device)
+        y = nodemodel(S_i, C[:, :-1].contiguous(), x_len)
         print(y[0].shape, y[1].shape)
-        e = edgemodel(S_ij[:, 0, ].cuda(), y[1][:, :, 0, ])
+        print("======================")
+        e = edgemodel(S_ij[:, 0, :MAX_TIMESTEP].contiguous().to(device), y[1][:, 0, ].contiguous())
         print(e.shape)
         break
