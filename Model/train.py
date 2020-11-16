@@ -7,7 +7,7 @@ from Model.model import NodeRNN, EdgeRNN
 from Model.dataset import MolDataset
 
 
-def train(train_list, test_list, num_epoch, batch_size):
+def train(train_list, test_list, num_epoch, batch_size, start_epoch=1):
     train_dataset = MolDataset(train_list)
     test_dataset = MolDataset(test_list)
     train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=batch_size, shuffle=False, drop_last=True)
@@ -17,15 +17,18 @@ def train(train_list, test_list, num_epoch, batch_size):
                          hidden_header_size=64, out_features=len(ATOM_IDX), seq_len=MAX_NODE).to(device)
     edge_model = EdgeRNN(input_size=len(BOND_IDX), emb_size=16, hidden_rnn_size=128,
                          hidden_header_size=64, out_features=len(BOND_IDX), seq_len=MAX_TIMESTEP).to(device)
+    if start_epoch > 1:
+        node_model.load_state_dict(torch.load(f"data/model/NodeRNN-ep{start_epoch-1}.pth"))
+        edge_model.load_state_dict(torch.load(f"data/model/EdgeRNN-ep{start_epoch-1}.pth"))
 
-    # weights = torch.tensor([1.0, 1000.0, 1000.0, 1000.0, 1.0]).cuda()
+    # weights = torch.tensor([1.0, 100.0, 100.0, 100.0, 1.0]).cuda()
     node_criterion = nn.CrossEntropyLoss(ignore_index=0)
     edge_criterion = nn.CrossEntropyLoss()
 
     node_optimizer = optim.Adam(node_model.parameters(), lr=1e-4)
     edge_optimizer = optim.Adam(edge_model.parameters(), lr=1e-4)
 
-    for n in range(1, num_epoch+1):
+    for n in range(start_epoch, num_epoch+1):
         for i, (S_i, C, S_ij, x_len) in enumerate(train_loader):
             S_i = S_i.to(device)
             C = C.to(device)
@@ -64,7 +67,7 @@ def train(train_list, test_list, num_epoch, batch_size):
                 C = C.to(device)
                 S_ij = S_ij.to(device)
 
-                y_node = node_model(S_i, C[:, :-1], x_len)
+                y_node = node_model(S_i[:, :-1], C[:, :-1], x_len)
 
                 edge_pred = torch.zeros([batch_size, MAX_NODE * MAX_TIMESTEP, len(BOND_IDX)], requires_grad=False).to(
                     device)
@@ -80,15 +83,16 @@ def train(train_list, test_list, num_epoch, batch_size):
                 test_node_losses.append(float(node_loss))
                 test_edge_losses.append(float(edge_loss))
 
-            print("EPOCH%d: Validation Edge loss:%f" % (n, float(np.mean(test_node_losses))))
+            print("EPOCH%d: Validation Node loss:%f" % (n, float(np.mean(test_node_losses))))
             print("EPOCH%d: Validation Edge loss:%f" % (n, float(np.mean(test_edge_losses))))
 
 
 if __name__ == "__main__":
-    train_list = read_smilesset("data/zinc_250k_train_sorted.smi")
-    test_list = read_smilesset("data/zinc_250k_test_sorted.smi")
+    train_list = read_smilesset("data/zinc_train_sorted_block10-20.smi")
+    test_list = read_smilesset("data/zinc_test_sorted_block10-20.smi")
 
     start_time = time.time()
-    train(train_list, test_list, num_epoch=50, batch_size=256)
+    train(train_list, test_list, num_epoch=200, batch_size=256, start_epoch=81)
     end_time = time.time()
     print("elapsed time: %f" % (end_time - start_time))
+
